@@ -1,0 +1,37 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: sheet-search
+          region: ${{ vars.GCP_REGION }}
+          source: .
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          env_vars: |
+            SHEET_ID=${{ vars.SHEET_ID }}
+            SHEET_RANGE=${{ vars.SHEET_RANGE }}
+          flags: --allow-unauthenticated
+
+      - run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
