@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sheet Search</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+  input[type="search"] {
+    width: 100%;
+    font-size: 1.1rem;
+    padding: 0.6rem 0.8rem;
+    box-sizing: border-box;
+    border: 1px solid #888;
+    border-radius: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #ddd; }
+  th { position: sticky; top: 0; background: Canvas; }
+  #status { margin-top: 0.5rem; opacity: 0.7; font-size: 0.85rem; }
+  #results-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Sheet Search</h1>
+<input id="q" type="search" placeholder="Type to search…" autofocus />
+<div id="status"></div>
+<div id="results-wrap">
+  <table id="results" hidden>
+    <thead><tr id="headerRow"></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+</div>
+
+<script>
+const input = document.getElementById('q');
+const status = document.getElementById('status');
+const table = document.getElementById('results');
+const headerRow = document.getElementById('headerRow');
+const body = document.getElementById('body');
+
+let debounceTimer;
+let renderedHeaders = false;
+
+input.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runSearch, 200);
+});
+
+async function runSearch() {
+  const q = input.value.trim();
+  if (!q) {
+    table.hidden = true;
+    status.textContent = '';
+    return;
+  }
+  status.textContent = 'Searching…';
+  try {
+    const res = await fetch('/api/search?q=' + encodeURIComponent(q));
+    if (!res.ok) throw new Error('Request failed');
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    status.textContent = 'Search failed. Try again.';
+  }
+}
+
+function render(data) {
+  if (!renderedHeaders) {
+    headerRow.innerHTML = data.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('');
+    renderedHeaders = true;
+  }
+  body.innerHTML = data.rows
+    .map((row) => `<tr>${row.map((c) => `<td>${escapeHtml(c ?? '')}</td>`).join('')}</tr>`)
+    .join('');
+  table.hidden = data.rows.length === 0;
+  status.textContent = `${data.rows.length} match${data.rows.length === 1 ? '' : 'es'}`;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>
